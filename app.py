@@ -52,7 +52,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">William O\'Neal "Cup with Handle" 패턴 스크리너</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">한국 및 미국 주식시장(KOSPI, KOSDAQ, S&P 500, NASDAQ 100) 종목 중 컵앤핸들 돌파 및 거래량 동반 종목 발굴 프로그램</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">한국 및 미국 주식시장 종목 중 컵앤핸들(Cup & Handle) 돌파 및 거래량 동반 종목 발굴 프로그램</div>', unsafe_allow_html=True)
 
 # 기법 소개
 with st.expander("ℹ️ 윌리엄 오닐의 'Cup with Handle' (컵앤핸들) 패턴이란?"):
