@@ -30,7 +30,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-title {
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 700;
         color: #8AB4F8; /* 어두운 바탕에서도 잘 보이고 고급스러운 연파랑색 */
         margin-bottom: 0.2rem;
@@ -51,7 +51,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-title">🏆 Cup with Handle 패턴 스크리너</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">William O\'Neal "Cup with Handle" 패턴 스크리너</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">한국 및 미국 주식시장(KOSPI, KOSDAQ, S&P 500, NASDAQ 100) 종목 중 컵앤핸들 돌파 및 거래량 동반 종목 발굴 프로그램</div>', unsafe_allow_html=True)
 
 # 기법 소개
