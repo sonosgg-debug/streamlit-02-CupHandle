@@ -461,12 +461,24 @@ if st.session_state.screened_df is not None:
                     dt_break = pd.to_datetime(row['breakout_date'])
                     val_c = row['peak_c_price']
                     
+                    # 테마에 따라 저항선 색상 결정 (다크 모드: 흰색, 라이트 모드: 검은색)
+                    theme_type = "dark"
+                    try:
+                        if hasattr(st, "context") and st.context.theme:
+                            theme_type = getattr(st.context.theme, "type", "dark")
+                            if not theme_type:
+                                theme_type = st.context.theme.get("type", "dark")
+                    except Exception:
+                        pass
+                    
+                    line_color = "#FFFFFF" if theme_type == "dark" else "#000000"
+                    
                     fig.add_trace(
                         go.Scatter(
                             x=[dt_a, dt_break],
                             y=[val_c, val_c],
                             mode='lines',
-                            line=dict(color='#4285F4', width=2, dash='dash'),
+                            line=dict(color=line_color, width=2, dash='dash'),
                             name="컵 저항선 (Peak C)"
                         ),
                         row=1, col=1
