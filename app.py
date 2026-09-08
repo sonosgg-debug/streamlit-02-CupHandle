@@ -30,14 +30,16 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-title {
-        font-size: 2.1rem;
+        font-size: 2.0rem;
         font-weight: 700;
         color: #8AB4F8; /* 어두운 바탕에서도 잘 보이고 고급스러운 연파랑색 */
+        text-align: center;
         margin-bottom: 0.2rem;
     }
     .sub-title {
-        font-size: 1rem;
+        font-size: 0.9rem;
         color: #BDC1C6; /* 밝은 회색으로 가독성 향상 */
+        text-align: center;
         margin-bottom: 2rem;
     }
     .metric-card {
@@ -47,6 +49,16 @@ st.markdown("""
         border-radius: 8px;
         border-left: 5px solid #8AB4F8; /* 하늘색 테두리 포인트 */
         margin-bottom: 10px;
+    }
+    /* 안내문(st.info) 폰트 크기 및 이모지 아이콘 크기 축소 */
+    .stAlert p, .stAlert [data-testid="stMarkdownContainer"] {
+        font-size: 0.88rem !important;
+    }
+    .stAlert [data-testid="stAlertDynamicIcon"],
+    .stAlert [data-testid="stIconEmoji"] {
+        font-size: 1.0rem !important;
+        width: 1.0rem !important;
+        height: 1.0rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
