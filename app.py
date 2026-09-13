@@ -3,6 +3,9 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import datetime
+
+# 한국 표준시(KST) 타임존 (UTC+9)
+KST = datetime.timezone(datetime.timedelta(hours=9))
 import io
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -248,7 +251,7 @@ if start_screening:
             st.session_state.screened_df = pd.DataFrame()
             st.session_state.raw_screened_df = pd.DataFrame()
             
-        st.session_state.last_run_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        st.session_state.last_run_time = datetime.datetime.now(KST).strftime('%Y-%m-%d %H:%M:%S')
         st.session_state.market_type_used = market_choice
 
 # 결과 디스플레이
@@ -381,7 +384,7 @@ if st.session_state.screened_df is not None:
             "미국 NASDAQ 100 (US)": "NQ"
         }
         market_code = market_code_map.get(st.session_state.market_type_used, "ALL")
-        today_str = datetime.date.today().strftime('%Y-%m-%d')
+        today_str = datetime.datetime.now(KST).strftime('%Y-%m-%d')
         excel_filename = f"CupWithHandle-{market_code}-{today_str}.xlsx"
 
         # 타이틀 및 엑셀 다운로드 버튼 (동일 라인 양 끝 배치)
