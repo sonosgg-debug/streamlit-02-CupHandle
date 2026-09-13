@@ -258,20 +258,7 @@ if st.session_state.screened_df is not None:
     if st.session_state.screened_df.empty:
         st.warning("조건에 부합하는 종목이 발견되지 않았습니다. 파라미터를 조절하여 다시 스크리닝해 보세요.")
     else:
-        st.markdown(f"#### <span style='color: #8AB4F8;'>스크리닝 결과 (총 {len(st.session_state.screened_df)}개 종목)</span>", unsafe_allow_html=True)
-        
-        # 테이블 소수점 등 출력 포맷 가공
-        df_format = st.session_state.screened_df.copy()
-        df_format['돌파 가격'] = df_format.apply(lambda r: fmt_curr(r['돌파 가격'], r['티커']), axis=1)
-        df_format['컵 깊이(%)'] = df_format['컵 깊이(%)'].map('{:.2f}%'.format)
-        df_format['핸들 깊이(%)'] = df_format['핸들 깊이(%)'].map('{:.2f}%'.format)
-        df_format['컵 기간(일)'] = df_format['컵 기간(일)'].map('{:,.0f}일'.format)
-        df_format['핸들 기간(일)'] = df_format['핸들 기간(일)'].map('{:,.0f}일'.format)
-        df_format['거래량 비율'] = df_format['거래량 비율'].map('{:.2f}배'.format)
-        
-        st.dataframe(df_format, use_container_width=True)
-        
-        # --- 엑셀 저장 및 다운로드 기능 ---
+        # --- 엑셀 저장 및 다운로드 파일 사전 생성 ---
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_excel = st.session_state.raw_screened_df.copy()
@@ -396,13 +383,30 @@ if st.session_state.screened_df is not None:
         market_code = market_code_map.get(st.session_state.market_type_used, "ALL")
         today_str = datetime.date.today().strftime('%Y-%m-%d')
         excel_filename = f"CupWithHandle-{market_code}-{today_str}.xlsx"
+
+        # 타이틀 및 엑셀 다운로드 버튼 (동일 라인 양 끝 배치)
+        col_title, col_download = st.columns([4, 1], vertical_alignment="bottom")
+        with col_title:
+            st.markdown(f"#### <span style='color: #8AB4F8;'>스크리닝 결과 (총 {len(st.session_state.screened_df)}개 종목)</span>", unsafe_allow_html=True)
+        with col_download:
+            st.download_button(
+                label="📥 엑셀 파일 다운로드",
+                data=excel_data,
+                file_name=excel_filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
         
-        st.download_button(
-            label="📥 엑셀 파일 다운로드",
-            data=excel_data,
-            file_name=excel_filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        # 테이블 소수점 등 출력 포맷 가공
+        df_format = st.session_state.screened_df.copy()
+        df_format['돌파 가격'] = df_format.apply(lambda r: fmt_curr(r['돌파 가격'], r['티커']), axis=1)
+        df_format['컵 깊이(%)'] = df_format['컵 깊이(%)'].map('{:.2f}%'.format)
+        df_format['핸들 깊이(%)'] = df_format['핸들 깊이(%)'].map('{:.2f}%'.format)
+        df_format['컵 기간(일)'] = df_format['컵 기간(일)'].map('{:,.0f}일'.format)
+        df_format['핸들 기간(일)'] = df_format['핸들 기간(일)'].map('{:,.0f}일'.format)
+        df_format['거래량 비율'] = df_format['거래량 비율'].map('{:.2f}배'.format)
+        
+        st.dataframe(df_format, use_container_width=True)
         
         # --- 개별 종목 차트 시각화 영역 ---
         st.markdown("---")
