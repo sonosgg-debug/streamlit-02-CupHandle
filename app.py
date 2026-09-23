@@ -243,43 +243,6 @@ with st.expander("ℹ️ 윌리엄 오닐의 'Cup with Handle' (컵앤핸들) �
        * 이때 돌파 당일의 거래량은 **최근 20일 평균 거래량의 1.5배(150%) 이상** 급증하여 매수세 유입을 증명해야 합니다.
     """)
 
-# 사이드바 설정 영역
-st.sidebar.header("⚙️ 스크리닝 조건 설정")
-
-market_choice = st.sidebar.selectbox(
-    "대상 시장 선택",
-    ["코스피 (KOSPI)", "코스닥 (KOSDAQ)", "전체 시장 (KOSPI + KOSDAQ)", "미국 S&P 500 (US)", "미국 NASDAQ 100 (US)"],
-    index=0
-)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("컵(Cup) 설정")
-min_cup_width = st.sidebar.slider("최소 컵 기간 (영업일)", 20, 90, 35, step=5)
-max_cup_width = st.sidebar.slider("최대 컵 기간 (영업일)", 100, 300, 220, step=10)
-min_cup_depth = st.sidebar.slider("최소 컵 깊이 (%)", 5, 30, 10, step=1) / 100.0
-max_cup_depth = st.sidebar.slider("최대 컵 깊이 (%)", 30, 70, 50, step=5) / 100.0
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("핸들(Handle) 설정")
-min_handle_width = st.sidebar.slider("최소 핸들 기간 (영업일)", 2, 15, 5, step=1)
-max_handle_width = st.sidebar.slider("최대 핸들 기간 (영업일)", 15, 50, 30, step=5)
-max_handle_depth = st.sidebar.slider("최대 핸들 깊이 (%)", 5, 35, 15, step=1) / 100.0
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("기타 필터 설정")
-breakout_vol_factor = st.sidebar.slider("최소 돌파 거래량 배수", 1.0, 3.0, 1.5, step=0.1)
-prior_trend_gain = st.sidebar.slider("최소 선행 상승률 (%)", 10, 50, 25, step=5) / 100.0
-breakout_window = st.sidebar.slider("최근 돌파 허용 기간 (영업일)", 1, 15, 5, step=1)
-
-chunk_size = st.sidebar.number_input(
-    "데이터 일괄 요청 크기 (Chunk)",
-    min_value=10,
-    max_value=100,
-    value=50,
-    step=10,
-    help="yfinance API로 한 번에 다운로드할 종목 개수입니다. 너무 크게 설정하면 API 에러가 발생할 수 있습니다."
-)
-
 # 세션 상태 초기화
 if 'screened_df' not in st.session_state:
     st.session_state.screened_df = None
@@ -290,8 +253,46 @@ if 'market_type_used' not in st.session_state:
 if 'raw_screened_df' not in st.session_state:
     st.session_state.raw_screened_df = None
 
-# 스크리닝 시작 버튼
-start_screening = st.sidebar.button("🔍 스크리닝 시작", type="primary", use_container_width=True)
+# 사이드바 설정 영역
+with st.sidebar:
+    st.header("⚙️ 스크리닝 조건 설정")
+
+    market_choice = st.selectbox(
+        "대상 시장 선택",
+        ["코스피 (KOSPI)", "코스닥 (KOSDAQ)", "전체 시장 (KOSPI + KOSDAQ)", "미국 S&P 500 (US)", "미국 NASDAQ 100 (US)"],
+        index=0
+    )
+
+    st.markdown("---")
+    st.subheader("🎯 컵(Cup) 패턴 설정")
+    min_cup_width = st.slider("최소 컵 기간 (영업일)", 20, 90, 35, step=5)
+    max_cup_width = st.slider("최대 컵 기간 (영업일)", 100, 300, 220, step=10)
+    min_cup_depth = st.slider("최소 컵 깊이 (%)", 5, 30, 10, step=1) / 100.0
+    max_cup_depth = st.slider("최대 컵 깊이 (%)", 30, 70, 50, step=5) / 100.0
+
+    st.markdown("---")
+    st.subheader("🎯 핸들(Handle) 패턴 설정")
+    min_handle_width = st.slider("최소 핸들 기간 (영업일)", 2, 15, 5, step=1)
+    max_handle_width = st.slider("최대 핸들 기간 (영업일)", 15, 50, 30, step=5)
+    max_handle_depth = st.slider("최대 핸들 깊이 (%)", 5, 35, 15, step=1) / 100.0
+
+    st.markdown("---")
+    st.subheader("🎯 돌파 및 거래량 필터")
+    breakout_vol_factor = st.slider("최소 돌파 거래량 배수", 1.0, 3.0, 1.5, step=0.1)
+    prior_trend_gain = st.slider("최소 선행 상승률 (%)", 10, 50, 25, step=5) / 100.0
+    breakout_window = st.slider("최근 돌파 허용 기간 (영업일)", 1, 15, 5, step=1)
+
+    chunk_size = st.number_input(
+        "데이터 일괄 요청 크기 (Chunk)",
+        min_value=10,
+        max_value=100,
+        value=50,
+        step=10,
+        help="yfinance API로 한 번에 다운로드할 종목 개수입니다. 너무 크게 설정하면 API 에러가 발생할 수 있습니다."
+    )
+
+    # 스크리닝 시작 버튼
+    start_screening = st.button("🔍 스크리닝 시작", type="primary", use_container_width=True)
 
 if start_screening:
     market_map = {
