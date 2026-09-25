@@ -592,7 +592,12 @@ if st.session_state.screened_df is not None:
         # 타이틀 및 엑셀 다운로드 버튼 (동일 라인 양 끝 배치)
         col_title, col_download = st.columns([8, 2], vertical_alignment="bottom")
         with col_title:
-            st.markdown(f"#### <span style='color: #8AB4F8;'>스크리닝 결과 (총 {len(st.session_state.screened_df)}개 종목)</span>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='font-size: 1.20rem; font-weight: 700; color: #8AB4F8; margin: 10px 0 6px 0; display: flex; align-items: center; gap: 8px;'>"
+                f"<span>📋</span> 스크리닝 결과 (총 {len(st.session_state.screened_df)}개 종목)"
+                f"</div>",
+                unsafe_allow_html=True
+            )
         with col_download:
             st.download_button(
                 label="📥 엑셀 파일 다운로드",
@@ -615,7 +620,12 @@ if st.session_state.screened_df is not None:
         
         # --- 개별 종목 차트 시각화 영역 ---
         st.markdown("---")
-        st.markdown("#### <span style='color: #8AB4F8;'>종목별 컵앤핸들 패턴 분석 차트</span>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size: 1.20rem; font-weight: 700; color: #8AB4F8; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 8px;'>"
+            "<span>📈</span> 종목별 컵앤핸들 패턴 분석 차트"
+            "</div>",
+            unsafe_allow_html=True
+        )
         
         selected_stock_name = st.selectbox(
             "시각화할 종목을 선택하세요",
@@ -827,7 +837,9 @@ if st.session_state.screened_df is not None:
                 # 상세 분석 정보 카드 출력
                 st.markdown(f"""
                 <div class="metric-card">
-                    <h4>💡 {selected_stock_name} ({ticker}) 컵앤핸들 상세 패턴 통계</h4>
+                    <div style="font-size: 1.00rem; font-weight: 600; color: #E2E8F0; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                        <span>💡</span> {selected_stock_name} ({ticker}) 컵앤핸들 상세 패턴 통계
+                    </div>
                     <ul>
                         <li><b>돌파 가격:</b> {fmt_curr(row['breakout_price'], ticker)} (돌파 감지일: {row['breakout_date']})</li>
                         <li><b>돌파 시점 거래량 비율:</b> <span style="color:#EA4335; font-weight:bold;">{row['volume_increase_ratio']:.2f}배</span> (20일 평균 거래량 대비)</li>
