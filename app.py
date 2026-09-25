@@ -14,6 +14,21 @@ from openpyxl.utils import get_column_letter
 from tickers import get_krx_tickers
 from screener import screen_single_stock
 
+STANDARD_CHART_THEME = {
+    'paper_bgcolor': '#1E293B',    # Tailwind Slate-800 (외곽 카드 배경)
+    'plot_bgcolor': '#0F172A',     # Tailwind Slate-900 (내부 딥 블랙 플롯)
+    'text_main': '#F8FAFC',        # 타이틀/헤더 텍스트 (순백색)
+    'text_body': '#E2E8F0',        # 본문 및 축 라벨 (부드러운 화이트)
+    'text_muted': '#CBD5E1',       # 축 눈금 수치 텍스트 (Slate-300)
+    'grid_color': '#334155',       # 그리드 격자선 (Slate-700)
+    'border_color': '#475569',     # 축 기준선 (Slate-600)
+    'legend_bg': 'rgba(30, 41, 59, 0.85)',
+    'legend_border': '#334155',
+    'hover_bg': 'rgba(15, 23, 42, 0.9)',
+    'hover_border': '#334155'
+}
+
+
 def fmt_curr(val, ticker):
     if pd.isna(val):
         return ""
@@ -32,6 +47,11 @@ st.set_page_config(
 # 커스텀 CSS로 UI 스타일링 (다크 테마 최적화 및 시인성 개선)
 st.markdown("""
 <style>
+    /* Streamlit 고정 상단 헤더 배경 투명화 */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+
     .main .block-container,
     [data-testid="stMainBlockContainer"],
     .block-container {
@@ -289,20 +309,20 @@ with st.sidebar:
     )
 
     st.markdown("<hr style='border: 0; height: 1px; background-color: #334155; margin: 16px 0;'>", unsafe_allow_html=True)
-    st.subheader("🎯 컵(Cup) 패턴 설정")
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;'>🎯 컵(Cup) 패턴 설정</div>", unsafe_allow_html=True)
     min_cup_width = st.slider("최소 컵 기간 (영업일)", 20, 90, 35, step=5)
     max_cup_width = st.slider("최대 컵 기간 (영업일)", 100, 300, 220, step=10)
     min_cup_depth = st.slider("최소 컵 깊이 (%)", 5, 30, 10, step=1) / 100.0
     max_cup_depth = st.slider("최대 컵 깊이 (%)", 30, 70, 50, step=5) / 100.0
 
     st.markdown("---")
-    st.subheader("🎯 핸들(Handle) 패턴 설정")
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;'>🎯 핸들(Handle) 패턴 설정</div>", unsafe_allow_html=True)
     min_handle_width = st.slider("최소 핸들 기간 (영업일)", 2, 15, 5, step=1)
     max_handle_width = st.slider("최대 핸들 기간 (영업일)", 15, 50, 30, step=5)
     max_handle_depth = st.slider("최대 핸들 깊이 (%)", 5, 35, 15, step=1) / 100.0
 
     st.markdown("---")
-    st.subheader("🎯 돌파 및 거래량 필터")
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;'>🎯 돌파 및 거래량 필터</div>", unsafe_allow_html=True)
     breakout_vol_factor = st.slider("최소 돌파 거래량 배수", 1.0, 3.0, 1.5, step=0.1)
     prior_trend_gain = st.slider("최소 선행 상승률 (%)", 10, 50, 25, step=5) / 100.0
     breakout_window = st.slider("최근 돌파 허용 기간 (영업일)", 1, 15, 5, step=1)
@@ -760,8 +780,8 @@ if st.session_state.screened_df is not None:
                 
                 fig.update_layout(
                     template="plotly_dark",
-                    paper_bgcolor="#1E293B",
-                    plot_bgcolor="#0F172A",
+                    paper_bgcolor=STANDARD_CHART_THEME['paper_bgcolor'],
+                    plot_bgcolor=STANDARD_CHART_THEME['plot_bgcolor'],
                     title=dict(
                         text=f"<b>📈 {selected_stock_name} ({ticker}) 'Cup with Handle' 분석 차트</b>",
                         font=dict(color="#F8FAFC", size=16)
