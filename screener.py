@@ -1,8 +1,13 @@
 import numpy as np
 import pandas as pd
 import logging
+from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import FinanceDataReader as fdr
+import yfinance as yf
 
 logger = logging.getLogger(__name__)
+KST = timezone(timedelta(hours=9))
 
 def detect_cup_with_handle(df, params=None):
     """
@@ -223,3 +228,158 @@ def screen_single_stock(ticker, name, df, params=None):
         return details
         
     return None
+
+
+def _process_single_stock(
+    ticker: str,
+    name: str,
+    start_date: str,
+    params: dict = None,
+    df_cached: pd.DataFrame = None
+):
+    """
+    단일 종목의 데이터를 수집하고 컵앤핸들 패턴을 분석하는 멀티스레딩 통합 워커 함수.
+    """
+    try:
+        if df_cached is not None:
+            df = df_cached
+        else:
+            code = ticker.split('.')[0]
+            df = fdr.DataReader(code, start_date)
+
+        if df is None or len(df) < 250:
+            return None
+
+        # 미체결 당일 더미 행(Volume=0) 방지 처리
+        if len(df) > 1 and df['Volume'].iloc[-1] == 0:
+            df = df.iloc[:-1]
+
+        # 거래정지나 최근 5영업일 거래량 전무 종목 제외
+        recent_vol = df['Volume'].iloc[-5:].sum()
+        if pd.isna(recent_vol) or recent_vol <= 0:
+            return None
+
+        df = df.dropna(subset=['Close', 'High', 'Low', 'Volume'])
+        if df.index.tz is not None:
+            df.index = df.index.tz_localize(None)
+
+        if len(df) < 250:
+            return None
+
+        return screen_single_stock(ticker, name, df, params)
+    except Exception:
+        return None
+
+
+def run_screening_task(
+    tickers_df: pd.DataFrame,
+    params: dict = None,
+    max_workers: int = 24,
+    progress_callback = None
+) -> pd.DataFrame:
+    """
+    App-20 초고속 멀티스레딩 엔진 방식을 적용하여
+    전체 유니버스 종목의 데이터 수집과 컵앤핸들 기하학 패턴 검증을 완전 병렬로 수행합니다.
+    """
+    if tickers_df is None or tickers_df.empty:
+        return pd.DataFrame()
+
+    total_stocks = len(tickers_df)
+    results = []
+    completed_count = 0
+
+    # 약 3년 전 날짜부터 수집 (250영업일 이상 이평 및 컵 기간 계산 충족)
+    start_date = (datetime.now(KST) - timedelta(days=1095)).strftime('%Y-%m-%d')
+
+    kr_mask = tickers_df['ticker'].str.endswith('.KS') | tickers_df['ticker'].str.endswith('.KQ')
+    df_kr = tickers_df[kr_mask].copy()
+    df_us = tickers_df[~kr_mask].copy()
+
+    # 1. 한국 주식: FinanceDataReader 기반 초고속 멀티스레딩 원스톱 수집 & 분석
+    if not df_kr.empty:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_stock = {
+                executor.submit(
+                    _process_single_stock,
+                    row['ticker'],
+                    row['회사명'],
+                    start_date,
+                    params
+                ): (row['ticker'], row['회사명'])
+                for _, row in df_kr.iterrows()
+            }
+
+            for future in as_completed(future_to_stock):
+                ticker, name = future_to_stock[future]
+                completed_count += 1
+                if progress_callback:
+                    progress_callback(completed_count, total_stocks, name)
+                try:
+                    res = future.result()
+                    if res is not None:
+                        results.append(res)
+                except Exception:
+                    pass
+
+    # 2. 미국 주식: yfinance 일괄 다운로드 후 멀티스레드 병렬 분석
+    if not df_us.empty:
+        us_tickers = df_us['ticker'].tolist()
+        name_map = dict(zip(df_us['ticker'], df_us['회사명']))
+        try:
+            data = yf.download(us_tickers, period="3y", group_by="ticker", progress=False, timeout=20)
+            us_stock_dfs = {}
+            for t in us_tickers:
+                try:
+                    if isinstance(data.columns, pd.MultiIndex):
+                        ticker_level = 'Ticker' if 'Ticker' in data.columns.names else 1
+                        tickers_in_data = data.columns.get_level_values(ticker_level).unique()
+                        if t not in tickers_in_data:
+                            continue
+                        df_single = data.xs(t, level=ticker_level, axis=1).dropna(subset=['Close', 'High', 'Low', 'Volume'])
+                    else:
+                        df_single = data.dropna(subset=['Close', 'High', 'Low', 'Volume'])
+
+                    if df_single.index.tz is not None:
+                        df_single.index = df_single.index.tz_localize(None)
+
+                    if len(df_single) >= 250:
+                        us_stock_dfs[t] = df_single
+                except Exception:
+                    continue
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_us = {
+                    executor.submit(
+                        _process_single_stock,
+                        t,
+                        name_map[t],
+                        start_date,
+                        params,
+                        us_stock_dfs[t]
+                    ): (t, name_map[t])
+                    for t in us_stock_dfs
+                }
+
+                for future in as_completed(future_to_us):
+                    t, name = future_to_us[future]
+                    completed_count += 1
+                    if progress_callback:
+                        progress_callback(completed_count, total_stocks, name)
+                    try:
+                        res = future.result()
+                        if res is not None:
+                            results.append(res)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"미국 주식 다운로드 중 오류: {e}")
+
+    if not results:
+        return pd.DataFrame()
+
+    df_res = pd.DataFrame(results)
+    # 거래량 비율 기준 내림차순 정렬
+    if 'volume_increase_ratio' in df_res.columns:
+        df_res = df_res.sort_values(by='volume_increase_ratio', ascending=False).reset_index(drop=True)
+
+    return df_res
