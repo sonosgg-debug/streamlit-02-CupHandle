@@ -383,3 +383,6 @@ def run_screening_task(
         df_res = df_res.sort_values(by='volume_increase_ratio', ascending=False).reset_index(drop=True)
 
     return df_res
+
+# 하위 호환성 별칭 제공
+run_screener = run_screening_task
