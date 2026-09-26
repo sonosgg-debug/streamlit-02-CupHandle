@@ -365,6 +365,9 @@ with st.sidebar:
         )
         min_marcap_val = marcap_options[marcap_label]
 
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    start_screening = st.button("🔍 스크리닝 시작", type="primary", use_container_width=True)
+
     st.markdown("<hr style='border: 0; height: 1px; background-color: #334155; margin: 16px 0;'>", unsafe_allow_html=True)
     st.markdown("<div style='font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 6px;'>🎯 컵(Cup) 패턴 설정</div>", unsafe_allow_html=True)
     min_cup_width = st.slider("최소 컵 기간 (영업일)", 20, 90, 35, step=5)
@@ -383,16 +386,6 @@ with st.sidebar:
     breakout_vol_factor = st.slider("최소 돌파 거래량 배수", 1.0, 3.0, 1.5, step=0.1)
     prior_trend_gain = st.slider("최소 선행 상승률 (%)", 10, 50, 25, step=5) / 100.0
     breakout_window = st.slider("최근 돌파 허용 기간 (영업일)", 1, 15, 5, step=1)
-
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    # 스크리닝 시작 버튼
-    start_screening = st.button("🔍 스크리닝 시작", type="primary", use_container_width=True)
-
-    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
-    st.info(
-        "💡 **알림**: 멀티스레딩 엔진이 백그라운드에서 실시간 데이터를 수집 및 병렬 연산합니다. "
-        "일반적으로 15~30초 내에 전 종목 컵앤핸들 스크리닝이 완료됩니다."
-    )
 
 if start_screening:
     market_map = {
