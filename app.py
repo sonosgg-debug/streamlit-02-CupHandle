@@ -669,14 +669,14 @@ if st.session_state.screened_df is not None:
             ticker = row['symbol']
             
             with st.spinner(f"{selected_stock_name} ({ticker}) 주가 데이터 가져오는 중..."):
-                # 차트 작성을 위해 3년치 다운로드
+                # 차트 작성을 위해 2년치 다운로드 (봉 두께 및 시인성 최적화)
                 is_kr = ticker.endswith('.KS') or ticker.endswith('.KQ')
                 if is_kr:
                     code = ticker.split('.')[0]
-                    start_date = (datetime.datetime.now() - datetime.timedelta(days=1095)).strftime('%Y-%m-%d')
+                    start_date = (datetime.datetime.now() - datetime.timedelta(days=730)).strftime('%Y-%m-%d')
                     df_chart = fdr.DataReader(code, start_date)
                 else:
-                    df_chart = yf.download(ticker, period="3y", progress=False)
+                    df_chart = yf.download(ticker, period="2y", progress=False)
                     if isinstance(df_chart.columns, pd.MultiIndex):
                         df_chart.columns = df_chart.columns.droplevel(1)
                 
@@ -698,7 +698,7 @@ if st.session_state.screened_df is not None:
                     row_heights=[0.7, 0.3]
                 )
                 
-                # 1. 캔들스틱 추가
+                # 1. 캔들스틱 추가 (고대비 선명한 컬러 적용)
                 fig.add_trace(
                     go.Candlestick(
                         x=df_chart.index,
@@ -707,8 +707,8 @@ if st.session_state.screened_df is not None:
                         low=df_chart['Low'],
                         close=df_chart['Close'],
                         name="주가",
-                        increasing_line_color='#EA4335',
-                        decreasing_line_color='#4285F4'
+                        increasing_line_color='#FF5252',
+                        decreasing_line_color='#4D96FF'
                     ),
                     row=1, col=1
                 )
@@ -804,8 +804,8 @@ if st.session_state.screened_df is not None:
                 except Exception:
                     pass
                 
-                # 4. 거래량 바 추가
-                colors = ['#EA4335' if df_chart['Close'].iloc[i] >= df_chart['Open'].iloc[i] else '#4285F4' for i in range(len(df_chart))]
+                # 4. 거래량 바 추가 (고대비 선명한 컬러 적용)
+                colors = ['#FF5252' if df_chart['Close'].iloc[i] >= df_chart['Open'].iloc[i] else '#4D96FF' for i in range(len(df_chart))]
                 fig.add_trace(
                     go.Bar(
                         x=df_chart.index,
@@ -821,7 +821,7 @@ if st.session_state.screened_df is not None:
                     go.Scatter(
                         x=df_chart.index,
                         y=df_chart['Vol_SMA_20'],
-                        line=dict(color='#5F6368', width=1.5),
+                        line=dict(color='#8AB4F8', width=1.2),
                         name="20일 거래량 MA"
                     ),
                     row=2, col=1
