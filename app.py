@@ -96,7 +96,7 @@ st.markdown("""
     }
     .metric-card {
         background-color: #202124; /* 검정색 계열의 배경 적용 */
-        color: #F1F3F4; /* 폰트를 밝은 색상으로 강제 지정 */
+        color: #CBD5E1; /* 눈 피로도 완화를 위한 부드러운 텍스트 색상 */
         padding: 15px;
         border-radius: 8px;
         border-left: 5px solid #8AB4F8; /* 하늘색 테두리 포인트 */
@@ -883,7 +883,7 @@ if st.session_state.screened_df is not None:
                 # 상세 분석 정보 카드 출력
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div style="font-size: 1.00rem; font-weight: 600; color: #E2E8F0; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <div style="font-size: 1.00rem; font-weight: 600; color: #CBD5E1; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
                         <span>💡</span> {selected_stock_name} ({ticker}) 컵앤핸들 상세 패턴 통계
                     </div>
                     <ul>
