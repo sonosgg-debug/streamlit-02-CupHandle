@@ -1,5 +1,3 @@
-import socket
-socket.setdefaulttimeout(15.0)
 
 import streamlit as st
 import pandas as pd
@@ -49,7 +47,6 @@ STANDARD_CHART_THEME = {
     'hover_bg': 'rgba(15, 23, 42, 0.9)',
     'hover_border': '#334155'
 }
-
 
 def fmt_curr(val, ticker):
     if pd.isna(val):
@@ -485,7 +482,6 @@ if start_screening:
             
         st.session_state.last_run_time = datetime.datetime.now(KST).strftime('%Y-%m-%d %H:%M:%S')
         st.session_state.market_type_used = market_choice
-
 
 # 결과 디스플레이
 if st.session_state.screened_df is not None:
