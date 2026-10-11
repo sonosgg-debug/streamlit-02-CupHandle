@@ -9,7 +9,7 @@ import yfinance as yf
 logger = logging.getLogger(__name__)
 KST = timezone(timedelta(hours=9))
 
-def detect_cup_with_handle(df, params=None):
+def detect_cup_with_handle(df, params=None, **kwargs):
     """
     주가 데이터프레임에서 Cup with Handle 패턴을 탐색합니다.
     
@@ -204,7 +204,7 @@ def detect_cup_with_handle(df, params=None):
                     
     return False, None
 
-def screen_single_stock(ticker, name, df, params=None):
+def screen_single_stock(ticker, name, df, params=None, **kwargs):
     """
     개별 주식 데이터프레임을 받아 Cup with Handle 패턴을 분석합니다.
     """
@@ -235,7 +235,8 @@ def _process_single_stock(
     name: str,
     start_date: str,
     params: dict = None,
-    df_cached: pd.DataFrame = None
+    df_cached: pd.DataFrame = None,
+    **kwargs
 ):
     """
     단일 종목의 데이터를 수집하고 컵앤핸들 패턴을 분석하는 멀티스레딩 통합 워커 함수.
@@ -275,7 +276,8 @@ def run_screening_task(
     tickers_df: pd.DataFrame,
     params: dict = None,
     max_workers: int = 24,
-    progress_callback = None
+    progress_callback = None,
+    **kwargs
 ) -> pd.DataFrame:
     """
     App-20 초고속 멀티스레딩 엔진 방식을 적용하여

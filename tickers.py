@@ -57,7 +57,10 @@ def get_fallback_marcap_map() -> dict:
         target_date = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
         url = f"{base_url}{target_date}.csv"
         try:
-            df = pd.read_csv(url, dtype={"Code": str, "ISU_SRT_CD": str}, low_memory=False)
+            resp = requests.get(url, timeout=3.0)
+            if resp.status_code != 200:
+                continue
+            df = pd.read_csv(io.StringIO(resp.text), dtype={"Code": str, "ISU_SRT_CD": str}, low_memory=False)
             code_col = "Code" if "Code" in df.columns else "ISU_SRT_CD"
             marcap_col = None
             for col in ["Marcap", "MKTCAP", "시가총액"]:
@@ -79,7 +82,7 @@ def get_fallback_marcap_map() -> dict:
     return {}
 
 
-def get_krx_tickers(market='KOSPI', scope='top500', min_marcap_eok=0) -> pd.DataFrame:
+def get_krx_tickers(market='KOSPI', scope='top500', min_marcap_eok=0, **kwargs) -> pd.DataFrame:
     """
     FinanceDataReader 및 위키피디아에서 상장 종목 목록을 다운로드하여 야후 파이낸스 티커 포맷으로 변환합니다.
     - market: 'KOSPI', 'KOSDAQ', 'ALL', 'S&P 500', 'NASDAQ 100'
@@ -226,7 +229,7 @@ def get_krx_tickers(market='KOSPI', scope='top500', min_marcap_eok=0) -> pd.Data
     return df_final.reset_index(drop=True)
 
 
-def get_latest_expected_trading_day(target_date: str = None) -> str:
+def get_latest_expected_trading_day(target_date: str = None, **kwargs) -> str:
     """
     가장 최근 거래 완료된 실제 영업일 YYYY-MM-DD 반환.
     - target_date가 전달된 경우: 해당 날짜 기준 (또는 직전 영업일)
