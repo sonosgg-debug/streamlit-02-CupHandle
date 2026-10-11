@@ -495,7 +495,7 @@ if st.session_state.screened_df is not None:
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_excel = st.session_state.raw_screened_df.copy()
             df_excel = df_excel.rename(columns={
-                'symbol': '티커',
+                'symbol': '코드/티커',
                 'name': '종목명',
                 'market': '시장',
                 'breakout_date': '돌파 감지일',
@@ -515,10 +515,17 @@ if st.session_state.screened_df is not None:
                 'valley_d_price': 'Valley D 가격'
             })
             
-            # 수치 데이터 반올림 및 라운딩 가공
+            # 수치 데이터 반올림 및 코드/티커 6자리 정제 가공
             def format_excel_data(row):
-                ticker = row['티커']
-                is_kr = ticker.endswith('.KS') or ticker.endswith('.KQ')
+                raw_code = str(row['코드/티커'] if '코드/티커' in row else row.get('symbol', '')).strip()
+                is_kr = raw_code.endswith('.KS') or raw_code.endswith('.KQ') or raw_code.isdigit()
+                
+                # 6자리 코드 처리 (.KS/.KQ 접미사 제거 및 6자리 000000 패딩 유지)
+                clean_code = raw_code[:-3] if (raw_code.endswith('.KS') or raw_code.endswith('.KQ')) else raw_code
+                if clean_code.isdigit():
+                    row['코드/티커'] = clean_code.zfill(6)
+                else:
+                    row['코드/티커'] = clean_code
                 
                 # 가격 컬럼 포맷팅
                 price_cols = ['돌파 가격', 'Peak A 가격', 'Valley B 가격', 'Peak C 가격', 'Valley D 가격']
@@ -540,6 +547,16 @@ if st.session_state.screened_df is not None:
             # 불필요한 인덱스성 컬럼 제거
             exclude_cols = ['peak_a_idx', 'valley_b_idx', 'peak_c_idx', 'valley_d_idx', 'breakout_idx', 'chart_path']
             df_excel = df_excel.drop(columns=[c for c in exclude_cols if c in df_excel.columns], errors='ignore')
+            
+            # 종목명을 B열(2번째 열)로 이동
+            if '종목명' in df_excel.columns:
+                cols = [c for c in df_excel.columns if c != '종목명']
+                if '코드/티커' in cols:
+                    code_idx = cols.index('코드/티커')
+                    cols.insert(code_idx + 1, '종목명')
+                else:
+                    cols.insert(1, '종목명')
+                df_excel = df_excel[cols]
             
             # 엑셀 쓰기
             df_excel.to_excel(writer, index=False, sheet_name='Cup With Handle')
@@ -574,33 +591,36 @@ if st.session_state.screened_df is not None:
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 
-            center_cols = [1, 2, 4, 6, 8, 10]  # 티커(1), 종목명(2), 돌파 감지일(4), 컵 깊이(6), 컵 기간(8), 거래량 비율(10)
+            headers = [str(worksheet.cell(row=1, column=c).value or '').strip() for c in range(1, max_col + 1)]
             
             for row_idx in range(2, max_row + 1):
-                ticker_val = str(worksheet.cell(row=row_idx, column=1).value or '')
-                is_kr = ticker_val.endswith('.KS') or ticker_val.endswith('.KQ')
+                code_cell = worksheet.cell(row=row_idx, column=1)
+                code_val = str(code_cell.value or '').strip()
+                if code_val.isdigit():
+                    code_val = code_val.zfill(6)
+                    code_cell.value = code_val
+                code_cell.number_format = '@'
+                
+                is_kr = code_val.isdigit() or (str(st.session_state.market_type_used).upper() in ['KOSPI', 'KOSDAQ', 'KS', 'KQ'])
                 
                 for c_idx in range(1, max_col + 1):
                     cell = worksheet.cell(row=row_idx, column=c_idx)
+                    h_name = headers[c_idx - 1]
                     
-                    # 1. 정렬 설정 (티커, 종목명, 돌파 감지일, F, H, J열은 가운데 정렬, K, M, O, Q열 및 기타 데이터는 오른쪽 정렬)
-                    if c_idx in center_cols:
-                        cell.alignment = Alignment(horizontal='center')
+                    # 1. 정렬 설정 (코드/티커, 종목명, 날짜 컬럼은 가운데 정렬, 수치/가격은 오른쪽 정렬)
+                    if h_name in ['코드/티커', '종목명', '돌파 감지일', 'Peak A 날짜', 'Valley B 날짜', 'Peak C 날짜', 'Valley D 날짜']:
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
                     else:
-                        cell.alignment = Alignment(horizontal='right')
+                        cell.alignment = Alignment(horizontal='right', vertical='center')
                     
                     # 2. 서식 설정
-                    # 소수점 데이터 (컵 깊이, 핸들 깊이, 거래량 비율) -> 0.00 형식
-                    if c_idx in [6, 7, 10]:
+                    if h_name == '코드/티커':
+                        cell.number_format = '@'
+                    elif h_name in ['컵 깊이(%)', '핸들 깊이(%)', '거래량 비율']:
                         cell.number_format = '0.00'
-                    # 가격 데이터 -> 한국 주식은 정수(천단위 구분), 미국 주식은 소수점 둘째자리(0.00)
-                    elif c_idx in [5, 12, 14, 16, 18]:
-                        if is_kr:
-                            cell.number_format = '#,##0'
-                        else:
-                            cell.number_format = '0.00'
-                    # 기간 데이터 -> 정수
-                    elif c_idx in [8, 9]:
+                    elif h_name in ['돌파 가격', 'Peak A 가격', 'Valley B 가격', 'Peak C 가격', 'Valley D 가격']:
+                        cell.number_format = '#,##0' if is_kr else '0.00'
+                    elif h_name in ['컵 기간(일)', '핸들 기간(일)']:
                         cell.number_format = '#,##0'
                         
         excel_data = output.getvalue()
