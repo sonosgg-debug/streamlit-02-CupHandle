@@ -38,6 +38,72 @@ def is_valid_screening_stock(code: str, name: str) -> bool:
 
 
 _CACHED_FALLBACK_MARCAP = None
+_CACHED_KRX_LISTING_DF = None
+
+
+def get_krx_raw_listing(m: str) -> pd.DataFrame:
+    """
+    KOSPI 또는 KOSDAQ 상장 종목 목록을 3단계 방어체계로 안전하게 수집합니다.
+    1단계: FinanceDataReader(m) 직접 조회 (KRX data.krx.co.kr)
+    2단계: FinanceDataReader('KRX') 전체 조회 후 시장 필터링
+    3단계: GitHub fdr_krx_data_cache 공식 백업 저장소에서 일자별 데이터 파싱 (KRX IP 차단 완벽 방어)
+    """
+    global _CACHED_KRX_LISTING_DF
+
+    # 1단계: fdr.StockListing(m) 시도
+    try:
+        df = fdr.StockListing(m)
+        if df is not None and not df.empty:
+            return df
+    except Exception as e:
+        print(f"[안내] fdr.StockListing({m}) KRX 직접 호출 실패: {e}")
+
+    # 2단계: fdr.StockListing('KRX') 시도
+    try:
+        df_all = fdr.StockListing('KRX')
+        if df_all is not None and not df_all.empty:
+            target_id = 'STK' if m == 'KOSPI' else 'KSQ'
+            if 'Market' in df_all.columns:
+                df = df_all[df_all['Market'].str.upper().str.contains(m)].copy()
+            elif 'MarketId' in df_all.columns:
+                df = df_all[df_all['MarketId'] == target_id].copy()
+            else:
+                df = df_all.copy()
+            if not df.empty:
+                return df
+    except Exception as e:
+        print(f"[안내] fdr.StockListing('KRX') 호출 실패: {e}")
+
+    # 3단계: GitHub FDR 공식 캐시 저장소 (KRX IP 차단 원천 방어)
+    if _CACHED_KRX_LISTING_DF is None or _CACHED_KRX_LISTING_DF.empty:
+        base_url = "https://raw.githubusercontent.com/FinanceData/fdr_krx_data_cache/refs/heads/master/data/listing/krx/"
+        today = datetime.now(KST)
+        for days_back in range(0, 11):
+            target_date = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
+            url = f"{base_url}{target_date}.csv"
+            try:
+                resp = requests.get(url, timeout=5.0)
+                if resp.status_code == 200 and resp.text:
+                    df_raw = pd.read_csv(io.StringIO(resp.text), dtype={"Code": str, "ISU_SRT_CD": str}, low_memory=False)
+                    if df_raw is not None and not df_raw.empty:
+                        _CACHED_KRX_LISTING_DF = df_raw
+                        print(f"[성공] GitHub FDR 캐시({target_date})에서 KRX 전체 종목 목록 로드 완료 ({len(df_raw)}개)")
+                        break
+            except Exception:
+                continue
+
+    if _CACHED_KRX_LISTING_DF is not None and not _CACHED_KRX_LISTING_DF.empty:
+        df_all = _CACHED_KRX_LISTING_DF.copy()
+        target_id = 'STK' if m == 'KOSPI' else 'KSQ'
+        if 'Market' in df_all.columns:
+            df = df_all[df_all['Market'].str.upper().str.contains(m)].copy()
+        elif 'MarketId' in df_all.columns:
+            df = df_all[df_all['MarketId'] == target_id].copy()
+        else:
+            df = df_all.copy()
+        return df
+
+    return pd.DataFrame()
 
 
 def get_fallback_marcap_map() -> dict:
@@ -46,9 +112,27 @@ def get_fallback_marcap_map() -> dict:
     최근 10영업일을 역순으로 탐색하여 시가총액이 유효하게 존재하는 가장 최근 거래일의 데이터를 로드하고
     {종목코드: 시가총액} 매핑 딕셔너리를 반환합니다.
     """
-    global _CACHED_FALLBACK_MARCAP
+    global _CACHED_FALLBACK_MARCAP, _CACHED_KRX_LISTING_DF
     if _CACHED_FALLBACK_MARCAP is not None and len(_CACHED_FALLBACK_MARCAP) > 0:
         return _CACHED_FALLBACK_MARCAP
+
+    if _CACHED_KRX_LISTING_DF is not None and not _CACHED_KRX_LISTING_DF.empty:
+        code_col = "Code" if "Code" in _CACHED_KRX_LISTING_DF.columns else "ISU_SRT_CD"
+        marcap_col = None
+        for col in ["Marcap", "MKTCAP", "시가총액"]:
+            if col in _CACHED_KRX_LISTING_DF.columns:
+                marcap_col = col
+                break
+        if marcap_col and code_col in _CACHED_KRX_LISTING_DF.columns:
+            valid_series = pd.to_numeric(_CACHED_KRX_LISTING_DF[marcap_col], errors="coerce")
+            if valid_series.notna().sum() > 500:
+                _CACHED_FALLBACK_MARCAP = dict(
+                    zip(
+                        _CACHED_KRX_LISTING_DF[code_col].astype(str).str.zfill(6),
+                        valid_series.fillna(0)
+                    )
+                )
+                return _CACHED_FALLBACK_MARCAP
 
     base_url = "https://raw.githubusercontent.com/FinanceData/fdr_krx_data_cache/refs/heads/master/data/listing/krx/"
     today = datetime.now(KST)
@@ -144,18 +228,10 @@ def get_krx_tickers(market='KOSPI', scope='top500', min_marcap_eok=0, **kwargs) 
 
     dfs_kr = []
     for m in target_markets:
-        try:
-            df_listing = fdr.StockListing(m)
-        except Exception as e:
-            print(f"StockListing({m}) 실패: {e}")
-            df_all = fdr.StockListing('KRX')
-            target_id = 'STK' if m == 'KOSPI' else 'KSQ'
-            if 'MarketId' in df_all.columns:
-                df_listing = df_all[df_all['MarketId'] == target_id].copy()
-            elif 'Market' in df_all.columns:
-                df_listing = df_all[df_all['Market'].str.upper() == m].copy()
-            else:
-                df_listing = df_all.copy()
+        df_listing = get_krx_raw_listing(m)
+        if df_listing is None or df_listing.empty:
+            print(f"[경고] {m} 시장 종목 목록 수집 실패")
+            continue
 
         # 컬럼 표준화
         if 'Code' not in df_listing.columns and 'Symbol' in df_listing.columns:
