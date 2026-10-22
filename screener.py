@@ -225,6 +225,7 @@ def screen_single_stock(ticker, name, df, params=None, **kwargs):
     found, details = detect_cup_with_handle(df_clean, params)
     if found:
         details['name'] = name
+        details['price'] = float(df_clean['Close'].iloc[-1])
         return details
         
     return None

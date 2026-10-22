@@ -72,13 +72,31 @@ STANDARD_CHART_THEME = {
     'hover_border': '#334155'
 }
 
-def fmt_curr(val, ticker):
-    if pd.isna(val):
+def fmt_curr(val, ticker_or_market):
+    if pd.isna(val) or val == "":
         return ""
-    if ticker.endswith('.KS') or ticker.endswith('.KQ'):
+    t_str = str(ticker_or_market).strip()
+    if t_str in ['KOSPI', 'KOSDAQ'] or t_str.endswith('.KS') or t_str.endswith('.KQ') or t_str.isdigit():
         return f"{val:,.0f}원"
     else:
         return f"${val:,.2f}"
+
+def clean_ticker_code(val):
+    s = str(val).strip()
+    if s.endswith('.KS') or s.endswith('.KQ'):
+        code = s[:-3]
+        return code.zfill(6) if code.isdigit() else code
+    if s.isdigit():
+        return s.zfill(6)
+    return s
+
+def fmt_display_marcap(val, market):
+    if pd.isna(val) or val <= 0:
+        return "-"
+    if market in ['KOSPI', 'KOSDAQ'] or str(market).startswith('K'):
+        return f"{int(round(val)):,}억"
+    else:
+        return f"{int(round(val)):,}"
 
 # 커스텀 CSS로 UI 스타일링 (다크 테마 최적화 및 시인성 개선)
 st.markdown("""
@@ -472,10 +490,28 @@ if start_screening:
 
         if df_screened is not None and not df_screened.empty:
             df_final = df_screened.copy()
-            # 출력용 한글 칼럼명 매핑
-            df_final_display = df_final.rename(columns={
-                'symbol': '티커',
+            # 시장 및 시가총액 안전 보강
+            if 'market' not in df_final.columns and '시장' in tickers_df.columns:
+                m_map = dict(zip(tickers_df['ticker'], tickers_df['시장']))
+                df_final['market'] = df_final['symbol'].map(m_map).fillna('KOSPI')
+            if 'marcap' not in df_final.columns and '시가총액_억원' in tickers_df.columns:
+                c_map = dict(zip(tickers_df['ticker'], tickers_df['시가총액_억원']))
+                df_final['marcap'] = df_final['symbol'].map(c_map).fillna(0)
+            if 'price' not in df_final.columns and 'breakout_price' in df_final.columns:
+                df_final['price'] = df_final['breakout_price']
+
+            # 원본 저장 (차트 시각화에서 원본 symbol을 그대로 사용)
+            st.session_state.raw_screened_df = df_final.copy()
+
+            # 코드/티커 6자리 정제 및 출력용 칼럼 매핑
+            df_final_display = df_final.copy()
+            df_final_display['코드/티커'] = df_final_display['symbol'].apply(clean_ticker_code)
+            
+            df_final_display = df_final_display.rename(columns={
                 'name': '종목명',
+                'market': '시장',
+                'marcap': '시가총액(억)',
+                'price': '현재가',
                 'breakout_date': '돌파 감지일',
                 'breakout_price': '돌파 가격',
                 'cup_depth_pct': '컵 깊이(%)',
@@ -485,13 +521,16 @@ if start_screening:
                 'volume_increase_ratio': '거래량 비율'
             })
             
-            # 불필요한 내부 칼럼은 제외하고 테이블용 구성
-            display_cols = ['티커', '종목명', '돌파 감지일', '돌파 가격', '컵 깊이(%)', '핸들 깊이(%)', '컵 기간(일)', '핸들 기간(일)', '거래량 비율']
-            available_cols = [c for c in display_cols if c in df_final_display.columns]
+            # 헤더 구성: 코드/티커, 종목명, 시장, 시가총액(억), 현재가, ...
+            desired_cols = [
+                '코드/티커', '종목명', '시장', '시가총액(억)', '현재가',
+                '돌파 감지일', '돌파 가격', '컵 깊이(%)', '핸들 깊이(%)',
+                '컵 기간(일)', '핸들 기간(일)', '거래량 비율'
+            ]
+            available_cols = [c for c in desired_cols if c in df_final_display.columns]
             df_final_display = df_final_display[available_cols].copy()
             
             st.session_state.screened_df = df_final_display
-            st.session_state.raw_screened_df = df_final  # 원본 데이터도 세션 저장
         else:
             st.session_state.screened_df = pd.DataFrame()
             st.session_state.raw_screened_df = pd.DataFrame()
@@ -510,10 +549,12 @@ if st.session_state.screened_df is not None:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_excel = st.session_state.raw_screened_df.copy()
+            df_excel['코드/티커'] = df_excel['symbol'].apply(clean_ticker_code)
             df_excel = df_excel.rename(columns={
-                'symbol': '코드/티커',
                 'name': '종목명',
                 'market': '시장',
+                'marcap': '시가총액(억)',
+                'price': '현재가',
                 'breakout_date': '돌파 감지일',
                 'breakout_price': '돌파 가격',
                 'cup_depth_pct': '컵 깊이(%)',
@@ -531,22 +572,33 @@ if st.session_state.screened_df is not None:
                 'valley_d_price': 'Valley D 가격'
             })
             
+            excel_cols = [
+                '코드/티커', '종목명', '시장', '시가총액(억)', '현재가',
+                '돌파 감지일', '돌파 가격', '컵 깊이(%)', '핸들 깊이(%)',
+                '컵 기간(일)', '핸들 기간(일)', '거래량 비율',
+                'Peak A 날짜', 'Peak A 가격', 'Valley B 날짜', 'Valley B 가격',
+                'Peak C 날짜', 'Peak C 가격', 'Valley D 날짜', 'Valley D 가격'
+            ]
+            df_excel = df_excel[[c for c in excel_cols if c in df_excel.columns]].copy()
+            
             # 수치 데이터 반올림 및 코드/티커 6자리 정제 가공
             def format_excel_data(row):
-                raw_code = str(row['코드/티커'] if '코드/티커' in row else row.get('symbol', '')).strip()
-                is_kr = raw_code.endswith('.KS') or raw_code.endswith('.KQ') or raw_code.isdigit()
+                mkt = str(row.get('시장', '')).strip()
+                code_str = str(row.get('코드/티커', '')).strip()
+                is_kr = mkt in ['KOSPI', 'KOSDAQ'] or code_str.isdigit()
                 
-                # 6자리 코드 처리 (.KS/.KQ 접미사 제거 및 6자리 000000 패딩 유지)
-                clean_code = raw_code[:-3] if (raw_code.endswith('.KS') or raw_code.endswith('.KQ')) else raw_code
-                if clean_code.isdigit():
-                    row['코드/티커'] = clean_code.zfill(6)
-                else:
-                    row['코드/티커'] = clean_code
+                # 6자리 코드 처리
+                if is_kr and code_str.isdigit():
+                    row['코드/티커'] = code_str.zfill(6)
                 
+                # 시가총액(억) (한국 주식: 억원 단위 정수)
+                if '시가총액(억)' in row and pd.notna(row['시가총액(억)']):
+                    row['시가총액(억)'] = int(round(row['시가총액(억)']))
+
                 # 가격 컬럼 포맷팅
-                price_cols = ['돌파 가격', 'Peak A 가격', 'Valley B 가격', 'Peak C 가격', 'Valley D 가격']
+                price_cols = ['현재가', '돌파 가격', 'Peak A 가격', 'Valley B 가격', 'Peak C 가격', 'Valley D 가격']
                 for col in price_cols:
-                    if col in row and not pd.isna(row[col]):
+                    if col in row and pd.notna(row[col]):
                         if is_kr:
                             row[col] = int(round(row[col]))
                         else:
@@ -554,8 +606,11 @@ if st.session_state.screened_df is not None:
                 
                 # 비율 및 수치
                 for col in ['컵 깊이(%)', '핸들 깊이(%)', '거래량 비율']:
-                    if col in row and not pd.isna(row[col]):
+                    if col in row and pd.notna(row[col]):
                         row[col] = round(row[col], 2)
+                for col in ['컵 기간(일)', '핸들 기간(일)']:
+                    if col in row and pd.notna(row[col]):
+                        row[col] = int(round(row[col]))
                 return row
                 
             df_excel = df_excel.apply(format_excel_data, axis=1)
@@ -563,16 +618,6 @@ if st.session_state.screened_df is not None:
             # 불필요한 인덱스성 컬럼 제거
             exclude_cols = ['peak_a_idx', 'valley_b_idx', 'peak_c_idx', 'valley_d_idx', 'breakout_idx', 'chart_path']
             df_excel = df_excel.drop(columns=[c for c in exclude_cols if c in df_excel.columns], errors='ignore')
-            
-            # 종목명을 B열(2번째 열)로 이동
-            if '종목명' in df_excel.columns:
-                cols = [c for c in df_excel.columns if c != '종목명']
-                if '코드/티커' in cols:
-                    code_idx = cols.index('코드/티커')
-                    cols.insert(code_idx + 1, '종목명')
-                else:
-                    cols.insert(1, '종목명')
-                df_excel = df_excel[cols]
             
             # 엑셀 쓰기
             df_excel.to_excel(writer, index=False, sheet_name='Cup With Handle')
@@ -583,7 +628,7 @@ if st.session_state.screened_df is not None:
             if max_row > 0:
                 worksheet.auto_filter.ref = f"A1:{get_column_letter(max_col)}{max_row}"
             
-            # 열 너비 자동 맞춤 (기존 대비 10% 축소)
+            # 열 너비 자동 맞춤
             for col in worksheet.columns:
                 max_len = 0
                 col_letter = get_column_letter(col[0].column)
@@ -592,8 +637,7 @@ if st.session_state.screened_df is not None:
                     length = sum(2 if ord(char) > 128 else 1 for char in val)
                     if length > max_len:
                         max_len = length
-                # 기존 대비 10% 줄인 너비 설정
-                worksheet.column_dimensions[col_letter].width = max(max_len + 4, 12) * 0.9
+                worksheet.column_dimensions[col_letter].width = max(max_len + 4, 12)
                 
             # 셀 스타일 및 정렬
             from openpyxl.styles import Alignment, PatternFill, Font
@@ -617,14 +661,17 @@ if st.session_state.screened_df is not None:
                     code_cell.value = code_val
                 code_cell.number_format = '@'
                 
-                is_kr = code_val.isdigit() or (str(st.session_state.market_type_used).upper() in ['KOSPI', 'KOSDAQ', 'KS', 'KQ'])
+                # C열(3번째 열: 시장)
+                cell_c = worksheet.cell(row=row_idx, column=3) if max_col >= 3 else None
+                mkt_val = str(cell_c.value or '').strip() if cell_c else ''
+                is_kr = mkt_val in ['KOSPI', 'KOSDAQ'] or code_val.isdigit()
                 
                 for c_idx in range(1, max_col + 1):
                     cell = worksheet.cell(row=row_idx, column=c_idx)
                     h_name = headers[c_idx - 1]
                     
-                    # 1. 정렬 설정 (코드/티커, 종목명, 날짜 컬럼은 가운데 정렬, 수치/가격은 오른쪽 정렬)
-                    if h_name in ['코드/티커', '종목명', '돌파 감지일', 'Peak A 날짜', 'Valley B 날짜', 'Peak C 날짜', 'Valley D 날짜']:
+                    # 1. 정렬 설정 (코드/티커, 종목명, 시장, 날짜 컬럼은 가운데 정렬, 수치/가격은 오른쪽 정렬)
+                    if h_name in ['코드/티커', '종목명', '시장', '돌파 감지일', 'Peak A 날짜', 'Valley B 날짜', 'Peak C 날짜', 'Valley D 날짜']:
                         cell.alignment = Alignment(horizontal='center', vertical='center')
                     else:
                         cell.alignment = Alignment(horizontal='right', vertical='center')
@@ -632,10 +679,12 @@ if st.session_state.screened_df is not None:
                     # 2. 서식 설정
                     if h_name == '코드/티커':
                         cell.number_format = '@'
+                    elif h_name == '시가총액(억)':
+                        cell.number_format = '#,##0'
+                    elif h_name in ['현재가', '돌파 가격', 'Peak A 가격', 'Valley B 가격', 'Peak C 가격', 'Valley D 가격']:
+                        cell.number_format = '#,##0' if is_kr else '#,##0.00'
                     elif h_name in ['컵 깊이(%)', '핸들 깊이(%)', '거래량 비율']:
                         cell.number_format = '0.00'
-                    elif h_name in ['돌파 가격', 'Peak A 가격', 'Valley B 가격', 'Peak C 가격', 'Valley D 가격']:
-                        cell.number_format = '#,##0' if is_kr else '0.00'
                     elif h_name in ['컵 기간(일)', '핸들 기간(일)']:
                         cell.number_format = '#,##0'
                         
@@ -693,12 +742,14 @@ if st.session_state.screened_df is not None:
         
         # 테이블 소수점 등 출력 포맷 가공
         df_format = st.session_state.screened_df.copy()
-        df_format['돌파 가격'] = df_format.apply(lambda r: fmt_curr(r['돌파 가격'], r['티커']), axis=1)
+        df_format['현재가'] = df_format.apply(lambda r: fmt_curr(r['현재가'], r['시장']), axis=1)
+        df_format['돌파 가격'] = df_format.apply(lambda r: fmt_curr(r['돌파 가격'], r['시장']), axis=1)
         df_format['컵 깊이(%)'] = df_format['컵 깊이(%)'].map('{:.2f}%'.format)
         df_format['핸들 깊이(%)'] = df_format['핸들 깊이(%)'].map('{:.2f}%'.format)
         df_format['컵 기간(일)'] = df_format['컵 기간(일)'].map('{:,.0f}일'.format)
         df_format['핸들 기간(일)'] = df_format['핸들 기간(일)'].map('{:,.0f}일'.format)
         df_format['거래량 비율'] = df_format['거래량 비율'].map('{:.2f}배'.format)
+        df_format['시가총액(억)'] = df_format.apply(lambda r: fmt_display_marcap(r['시가총액(억)'], r['시장']), axis=1)
         
         st.dataframe(df_format, use_container_width=True)
         
