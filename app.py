@@ -364,13 +364,13 @@ with st.sidebar:
 
     # 한국 시장(KOSPI, KOSDAQ)일 경우 시가총액 기반 대상 범위(Scope) 및 최소 시총 옵션 제공
     is_korean_market = market_choice in ["KOSPI", "KOSDAQ"]
-    scope_code = "top300"
-    min_marcap_val = 0
+    scope_code = "top200"
+    min_marcap_val = 5000
     if is_korean_market:
         scope_options = {
-            "시총 상위 300 (쾌속 모드)": "top300",
+            "시총 상위 200 (쾌속 모드)": "top200",
             "시총 상위 500 (확장 모드)": "top500",
-            "시총 상위 1,000 (심층 모드)": "top1000",
+            "시총 상위 1000 (심층 모드)": "top1000",
             "시장 전체 종목 (전체 모드)": "all"
         }
         scope_choice_label = st.selectbox(
@@ -384,14 +384,15 @@ with st.sidebar:
         marcap_options = {
             "제한 없음 (전체)": 0,
             "1,000억원 이상": 1000,
-            "3,000억원 이상 [추천]": 3000,
+            "3,000억원 이상": 3000,
             "5,000억원 이상": 5000,
             "1조원 이상": 10000
         }
+        default_marcap_idx = list(marcap_options.keys()).index("5,000억원 이상")
         marcap_label = st.selectbox(
             "💰 최소 시가총액",
             options=list(marcap_options.keys()),
-            index=0,
+            index=default_marcap_idx,
             help="설정한 시가총액 이상의 종목만 스크리닝합니다."
         )
         min_marcap_val = marcap_options[marcap_label]

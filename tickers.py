@@ -188,8 +188,8 @@ def get_krx_tickers(market='KOSPI', scope='top500', min_marcap_eok=0, **kwargs) 
             df_result['ticker'] = df_sp500['Symbol'].astype(str).str.replace('.', '-', regex=False)
             df_result['시장'] = 'S&P 500'
             df_result['시가총액_억원'] = 0
-            if scope == 'top300':
-                df_result = df_result.head(300)
+            if scope in ['top200', 'top300']:
+                df_result = df_result.head(200 if scope == 'top200' else 300)
             return df_result.reset_index(drop=True)
         except Exception as e:
             print(f"S&P 500 수집 실패: {e}")
@@ -287,7 +287,9 @@ def get_krx_tickers(market='KOSPI', scope='top500', min_marcap_eok=0, **kwargs) 
         df_sorted = df_sorted[df_sorted['Marcap_Num'] >= min_won].reset_index(drop=True)
 
     # 대상 범위 지정 (scope)
-    if scope == 'top300':
+    if scope == 'top200':
+        df_result = df_sorted.head(200)
+    elif scope == 'top300':
         df_result = df_sorted.head(300)
     elif scope == 'top500':
         df_result = df_sorted.head(500)
